@@ -1,11 +1,10 @@
 
+const gtaVariations = [
+  "Experience Grand Theft Auto VI, an open-world crime adventure set in the neon-lit streets of Vice City and the wider state of Leonida. Explore a vibrant world, encounter unforgettable characters, and dive into high-stakes action.",
 
-const nebulaDriftVariations = [
-  "Nebula Drift is an immersive sci-fi action adventure where players explore mysterious planets, battle hostile forces, and customize powerful spacecraft while uncovering the secrets of a vast galaxy.",
+  "Welcome to Vice City. Grand Theft Auto VI takes players into a sprawling world of crime, ambition, and action. Discover the diverse landscapes of Leonida and experience a story filled with danger and opportunity.",
 
-  "Embark on an unforgettable interstellar journey in Nebula Drift. Discover alien worlds, engage in thrilling space combat, and upgrade your ship as you navigate dangerous territories and hidden cosmic mysteries.",
-
-  "Explore the unknown in Nebula Drift, a space exploration adventure combining intense combat, planetary discovery, and deep ship customization. Every mission brings new challenges across a mysterious galaxy.",
+  "Step into the world of Grand Theft Auto VI, where the streets of Vice City come alive. Explore Leonida, navigate a thrilling criminal underworld, and experience the freedom of a massive open-world adventure.",
 ];
 
 export async function generateMockSuggestion(
@@ -16,7 +15,7 @@ export async function generateMockSuggestion(
   const source = input.trim();
 
   if (!source) {
-    throw new Error("Please enter a game description first.");
+    throw new Error("Enter a game description first.");
   }
 
   await new Promise<void>((resolve) => {
@@ -29,19 +28,24 @@ export async function generateMockSuggestion(
     );
   }
 
-  const index =
-    variationIndex % nebulaDriftVariations.length;
+  const index = variationIndex % gtaVariations.length;
 
-  if (source.toLowerCase().includes("nebula drift")) {
-    return nebulaDriftVariations[index];
+  const lowerSource = source.toLowerCase();
+
+  if (
+    lowerSource.includes("grand theft auto vi") ||
+    lowerSource.includes("gta vi") ||
+    lowerSource.includes("gta 6")
+  ) {
+    return gtaVariations[index];
   }
 
   const genericVariations = [
-    `${source}\n\nDiscover exciting challenges, explore immersive environments, and experience an adventure designed to reward curiosity and skill.`,
+    `${source}\n\nExplore immersive environments, take on exciting challenges, and experience a memorable adventure.`,
 
-    `${source}\n\nEmbark on a memorable gaming journey featuring engaging gameplay, surprising discoveries, and new challenges at every turn.`,
+    `${source}\n\nDiscover engaging gameplay, memorable encounters, and a world full of opportunities.`,
 
-    `${source}\n\nGet ready for an adventure where exploration, strategy, and player creativity come together to create exciting moments.`,
+    `${source}\n\nExperience an adventure where exploration, action, and player choice come together.`,
   ];
 
   return genericVariations[index];

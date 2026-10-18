@@ -1,75 +1,43 @@
-# React + TypeScript + Vite
+# AI Suggestion — Week 12 Assignment
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Overview
 
-Currently, two official plugins are available:
+A React + TypeScript exercise exploring **human-centered AI UX patterns**. The application demonstrates how users can review, edit, and control AI-generated suggestions before applying them to their content.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## What Was Created
 
-## React Compiler
+- **Reusable `AISuggestion` component** with preview, editing, apply, reject, regenerate, loading, error, and recovery states.
+- **`useAISuggestion` hook** to manage suggestion state and asynchronous request actions separately from the UI.
+- **Mock AI service** with sample GTA VI descriptions, simulated latency, and predictable failures for testing.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Project Structure
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```text
+src/
+├── components/
+│       ├── AISuggestion.tsx
+│       ├── AISuggestion.types.ts
+│       └── README.md
+├── hooks/
+│   ├── useAISuggestion.ts
+│   └── README.md
+├── lib/
+│   ├── mockAI.ts
+│   └── README.md
+├── App.tsx
+├── index.css
+└── main.tsx
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+## Module Responsibility
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+| Module | Responsibility |
+|---|---|
+| `App.tsx` | Demo layout, original content, and acceptance of suggestions. |
+| [`components/`](src/components/README.md) | Reusable suggestion UI, editing, actions, and accessible feedback. |
+| [`hooks/`](src/hooks/README.md) | Generation lifecycle, proposal state, retries, and recovery. |
+| [`lib/`](src/lib/README.md) | Predefined mock responses, request delay, and simulated errors. |
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Demo
 
-```
+[AI Suggestion Demo](Will add later)
