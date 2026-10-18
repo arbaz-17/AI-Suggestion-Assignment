@@ -1,96 +1,185 @@
+import { useRef, useState } from "react";
 
-import { useState } from "react";
+import { AISuggestion } from "./components/AISuggestion";
+import { useAISuggestion } from "./hooks/useAISuggestion";
+import { generateMockSuggestion } from "./lib/mockAI";
 
 const initialDescription =
-  "Nebula Drift is a space adventure game where players explore planets, fight enemies, and upgrade their ships.";
+  "Grand Theft Auto VI is an open-world action-adventure game set in Vice City and the state of Leonida. Players explore a vast world and experience a crime-driven story.";
 
 function App() {
-  const [description, setDescription] =
-    useState(initialDescription);
+  const [description, setDescription] = useState(initialDescription);
+
+  const [failNextRequest, setFailNextRequest] = useState(false);
+
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  const generateWithMock = (
+    input: string,
+    variationIndex: number,
+  ): Promise<string> => {
+    const shouldFail = failNextRequest;
+
+    if (shouldFail) {
+      setFailNextRequest(false);
+    }
+
+    return generateMockSuggestion(input, variationIndex, shouldFail);
+  };
+
+  const {
+    suggestion,
+    status,
+    error,
+    isBusy,
+    hasManualEdits,
+    generate,
+    regenerate,
+    retry,
+    keepPrevious,
+    updateSuggestion,
+    clearSuggestion,
+  } = useAISuggestion(generateWithMock);
+
+  const isReviewActive = status !== "idle";
+
+  const handleGenerate = () => {
+    if (isReviewActive || !description.trim()) return;
+
+    setFeedback(null);
+    generate(description);
+  };
+
+  const handleAccept = () => {
+    if (status !== "success" || !suggestion) return;
+
+    setDescription(suggestion);
+    clearSuggestion();
+    setFeedback("Suggestion applied successfully.");
+
+    descriptionRef.current?.focus();
+  };
+
+  const handleReject = () => {
+    clearSuggestion();
+    setFeedback("Suggestion discarded.");
+
+    descriptionRef.current?.focus();
+  };
+
+  const handleLoadSample = () => {
+    if (isReviewActive) return;
+
+    setDescription(initialDescription);
+    setFeedback(null);
+  };
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-12 text-slate-100">
-      <div className="mx-auto w-full max-w-2xl space-y-8">
-        <header className="space-y-3">
-          <span className="text-sm font-medium text-violet-400">
-            AI UX Mini Exercise
+    <main className="min-h-screen bg-[#ff6a00] px-3 py-6 text-white sm:px-6 sm:py-10">
+      <div className="mx-auto w-full max-w-5xl rounded-2xl border border-white/10 bg-[#0b0b0d] p-5 shadow-2xl sm:p-7">
+
+        <header className="mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+          <div className="space-y-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-400">
+              AI Suggestion Assignment - Optimus Fox
+            </p>
+
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+              Game Description Assistant
+            </h1>
+          </div>
+
+          <span className="rounded-md border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-[10px] font-medium text-orange-300">
+            Mock AI
           </span>
-
-          <h1 className="text-3xl font-bold tracking-tight">
-            AI Game Description Assistant
-          </h1>
-
-          <p className="text-sm leading-6 text-slate-400">
-            Improve your game descriptions with AI suggestions.
-            Preview, edit, and decide what gets applied.
-          </p>
         </header>
 
-        <section
-          aria-labelledby="description-heading"
-          className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-6"
-        >
-          <div className="space-y-1">
-            <h2
-              id="description-heading"
-              className="text-lg font-semibold"
-            >
-              Your Game Description
-            </h2>
 
-            <p className="text-sm text-slate-400">
-              Describe your game before requesting an improvement.
-            </p>
-          </div>
+        <div className="grid items-start gap-5 md:grid-cols-2">
 
-          <div className="space-y-2">
-            <label
-              htmlFor="game-description"
-              className="block text-sm font-medium"
-            >
-              Game Description
-            </label>
+          <section
+            aria-labelledby="description-heading"
+            className="min-w-0 space-y-3"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h2 id="description-heading" className="text-base font-semibold">
+                Your Description
+              </h2>
+
+              <button
+                type="button"
+                onClick={handleLoadSample}
+                disabled={isReviewActive}
+                className="rounded-lg border border-white/15 px-3 py-1.5 text-[11px] font-medium text-zinc-300 transition hover:border-orange-500/50 hover:text-orange-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Load Sample
+              </button>
+            </div>
 
             <textarea
+              ref={descriptionRef}
               id="game-description"
-              rows={5}
+              aria-labelledby="description-heading"
+              rows={8}
               value={description}
-              onChange={(event) =>
-                setDescription(event.target.value)
-              }
-              className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm leading-6 text-slate-100 outline-none transition-colors placeholder:text-slate-500 focus-visible:border-violet-400 focus-visible:ring-2 focus-visible:ring-violet-400/30"
-              placeholder="Describe your video game..."
+              onChange={(event) => {
+                setDescription(event.target.value);
+                setFeedback(null);
+              }}
+              readOnly={isReviewActive}
+              placeholder="Describe your game..."
+              className="w-full resize-y rounded-xl border border-white/15 bg-zinc-900 p-3.5 text-xs leading-6 text-zinc-100 outline-none transition placeholder:text-zinc-500 focus:border-orange-400 focus:ring-2 focus:ring-orange-400/20 read-only:opacity-75 text-base"
             />
-          </div>
 
-          <button
-            type="button"
-            disabled
-            className="rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Generate AI Suggestion
-          </button>
-        </section>
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={!description.trim()}
+              aria-disabled={isReviewActive}
+              className="rounded-lg bg-orange-500 px-4 py-2.5 text-xs font-semibold text-black transition hover:bg-orange-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-40 aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
+            >
+              Generate Suggestion
+            </button>
 
-        <section
-          aria-labelledby="suggestion-heading"
-          className="space-y-4 rounded-xl border border-dashed border-slate-700 p-6"
-        >
-          <h2
-            id="suggestion-heading"
-            className="text-lg font-semibold"
-          >
-            AI Suggestion
-          </h2>
+            <label className="flex w-fit cursor-pointer items-center gap-2 py-1">
+              <input
+                type="checkbox"
+                checked={failNextRequest}
+                onChange={(event) => setFailNextRequest(event.target.checked)}
+                disabled={isBusy}
+                className="size-3.5 accent-orange-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400"
+              />
 
-          <p className="text-sm text-slate-400">
-            Your AI-generated suggestion will appear here.
-          </p>
-        </section>
+              <span className="text-[11px] text-zinc-400">
+                Fail Request Demo
+              </span>
+            </label>
 
-        <p className="text-center text-xs text-slate-500">
-          Mock AI demo · All changes require your approval
-        </p>
+            {feedback && (
+              <p
+                role="status"
+                className="rounded-lg border border-orange-500/25 bg-orange-500/10 px-3 py-2 text-xs text-orange-200"
+              >
+                {feedback}
+              </p>
+            )}
+          </section>
+
+          <AISuggestion
+            suggestion={suggestion}
+            status={status}
+            error={error}
+            hasManualEdits={hasManualEdits}
+            onAccept={handleAccept}
+            onReject={handleReject}
+            onRegenerate={regenerate}
+            onRetry={retry}
+            onKeepPrevious={keepPrevious}
+            onSaveEdit={updateSuggestion}
+          />
+        </div>
       </div>
     </main>
   );

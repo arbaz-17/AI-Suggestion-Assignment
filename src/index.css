@@ -2,7 +2,8 @@
 @import "tailwindcss";
 
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-family: "Poppins", sans-serif;
+  font-synthesis: none;
 }
 
 body {
