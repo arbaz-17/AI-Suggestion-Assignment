@@ -40,4 +40,4 @@ src/
 
 ## Demo
 
-[AI Suggestion Demo](Will add later)
+[AI Suggestion Demo](https://arbaz-17.github.io/AI-Suggestion-Assignment/)
