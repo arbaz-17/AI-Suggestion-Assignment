@@ -1,9 +1,22 @@
-
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type {
   AISuggestionProps,
   AISuggestionStatus,
 } from "./AISuggestion.types";
+
+type EditSession = {
+  original: string;
+  text: string;
+};
+
+const primaryButton =
+  "rounded-xl border border-orange-500 bg-orange-500 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-orange-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-not-allowed disabled:opacity-50";
+
+const secondaryButton =
+  "rounded-xl border border-white/20 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400";
+
+const accentButton =
+  "rounded-xl border border-orange-500/50 bg-transparent px-4 py-2.5 text-sm font-semibold text-orange-300 transition hover:border-orange-400 hover:bg-orange-500/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-400";
 
 function getStatusLabel(status: AISuggestionStatus): string {
   switch (status) {
@@ -24,277 +37,377 @@ export function AISuggestion({
   suggestion,
   status,
   error,
+  hasManualEdits,
   onAccept,
   onReject,
   onRegenerate,
   onRetry,
+  onKeepPrevious,
   onSaveEdit,
 }: AISuggestionProps) {
-  // Local state is only used for temporary edits.
-  // null means the component is not in editing mode.
-  const [draft, setDraft] = useState<string | null>(null);
+  const id = useId();
+  const headingId = `${id}-heading`;
+  const editId = `${id}-edit`;
+  const editHelpId = `${id}-edit-help`;
 
-  // Derived state - no effects required.
-  const isEditing = draft !== null;
-  const isBusy =
-    status === "generating" || status === "regenerating";
+  const [editSession, setEditSession] = useState<EditSession | null>(null);
 
-  const hasSuggestion = Boolean(suggestion);
-  const statusLabel = getStatusLabel(status);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const statusFocusRef = useRef<HTMLDivElement>(null);
+  const restoreEditFocusRef = useRef(false);
 
-  // Editing handlers
+  const isBusy = status === "generating" || status === "regenerating";
+
+  const isEditing =
+    status === "success" &&
+    suggestion !== null &&
+    editSession !== null &&
+    editSession.original === suggestion;
+
+  const draft = isEditing ? editSession.text : "";
+
+  const showPreview =
+    suggestion !== null &&
+    (status === "success" || status === "regenerating" || status === "error") &&
+    !isEditing;
+
+  // Focus management is an appropriate use of an effect:
+  // it synchronizes React UI state with the DOM.
+  useEffect(() => {
+    if (isEditing) {
+      editorRef.current?.focus();
+      return;
+    }
+
+    if (restoreEditFocusRef.current && status === "success") {
+      editButtonRef.current?.focus();
+      restoreEditFocusRef.current = false;
+    }
+  }, [isEditing, status, suggestion]);
+
+  const announcement =
+    status === "generating"
+      ? "Generating an AI suggestion."
+      : status === "regenerating"
+        ? "Generating another variation. Your previous suggestion is preserved."
+        : status === "success"
+          ? hasManualEdits
+            ? "Edited suggestion saved and ready for review."
+            : "AI suggestion ready for review."
+          : "";
+
   const handleStartEdit = () => {
-    if (!suggestion || status !== "success") return;
+    if (status !== "success" || !suggestion) return;
 
-    setDraft(suggestion);
+    setEditSession({
+      original: suggestion,
+      text: suggestion,
+    });
   };
 
   const handleCancelEdit = () => {
-    setDraft(null);
+    restoreEditFocusRef.current = true;
+    setEditSession(null);
   };
 
   const handleSaveEdit = () => {
-    if (draft === null) return;
+    if (!isEditing || !draft.trim()) return;
 
-    const trimmed = draft.trim();
+    restoreEditFocusRef.current = true;
+    onSaveEdit(draft);
+    setEditSession(null);
+  };
 
-    if (!trimmed) return;
+  const handleAccept = () => {
+    setEditSession(null);
+    onAccept();
+  };
 
-    onSaveEdit(trimmed);
-    setDraft(null);
+  const handleReject = () => {
+    setEditSession(null);
+    onReject();
+  };
+
+  const handleRegenerate = () => {
+    if (isEditing || status !== "success") return;
+
+    // The clicked action will disappear during loading.
+    // Move focus to an element that remains mounted.
+    statusFocusRef.current?.focus();
+
+    setEditSession(null);
+    onRegenerate();
+  };
+
+  const handleRetry = () => {
+    statusFocusRef.current?.focus();
+    onRetry();
+  };
+
+  const handleKeepPrevious = () => {
+    restoreEditFocusRef.current = true;
+    setEditSession(null);
+    onKeepPrevious();
   };
 
   return (
     <section
-      aria-labelledby="ai-suggestion-heading"
-      className="space-y-5 rounded-[28px] border border-white/10 bg-black p-6 text-white shadow-2xl md:p-7"
+      aria-labelledby={headingId}
+      className="min-w-0 space-y-5 rounded-2xl border border-white/10 bg-black p-5 text-white shadow-xl md:p-6"
     >
       {/* Header */}
-      <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="space-y-3 border-b border-white/10 pb-4">
         <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-orange-400">
+          <p className="text-xs font-semibold uppercase tracking-widest text-orange-400">
             AI Review Panel
           </p>
 
-          <h2
-            id="ai-suggestion-heading"
-            className="text-2xl font-bold tracking-tight"
-          >
+          <h2 id={headingId} className="text-xl font-bold tracking-tight">
             AI Suggestion
           </h2>
 
-          <p className="max-w-2xl text-sm leading-6 text-zinc-400">
-            Review the AI-generated suggestion before applying it.
-            You can edit, accept, reject, or regenerate it.
+          <p className="text-sm leading-6 text-zinc-400">
+            Review the suggestion before applying it. Your original content
+            remains protected.
           </p>
         </div>
 
-        {/* Status indicator */}
+        {/* Stable focus destination for async actions */}
         <div
-          role="status"
-          aria-live="polite"
-          className="inline-flex w-fit items-center gap-2 rounded-full border border-white/10 bg-zinc-900 px-4 py-2 text-sm text-zinc-200"
+          ref={statusFocusRef}
+          tabIndex={-1}
+          className="inline-flex w-fit items-center gap-2 rounded-full border border-white/15 bg-zinc-900 px-3 py-2 text-xs text-zinc-200 outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 focus:ring-offset-black"
         >
           <span
-            className="h-2.5 w-2.5 rounded-full bg-orange-400"
             aria-hidden="true"
+            className="size-2 rounded-full bg-orange-400"
           />
 
           <span>
             Status:{" "}
-            <span className="font-semibold text-white">
-              {statusLabel}
-            </span>
+            <strong className="text-white">{getStatusLabel(status)}</strong>
           </span>
         </div>
+      </header>
+
+      {/* Single live region for generation updates */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {announcement}
       </div>
 
       {/* Suggestion content */}
       <div className="space-y-3">
-        <h3 className="text-base font-semibold text-white">
-          Suggested Content
-        </h3>
+        <h3 className="text-sm font-semibold">Suggested Content</h3>
 
-        <div className="min-h-[260px] rounded-2xl border border-white/10 bg-zinc-900/80 p-4">
-          {/* Idle state */}
+        <div
+          aria-busy={isBusy}
+          className="min-h-[260px] space-y-4 rounded-2xl border border-white/10 bg-zinc-900 p-4"
+        >
+          {/* Idle */}
           {status === "idle" && (
             <div className="flex min-h-[228px] items-center justify-center text-center">
-              <p className="max-w-sm text-sm italic leading-6 text-zinc-500">
-                Your AI suggestion will appear here once you
-                generate it.
+              <p className="max-w-xs text-sm italic leading-6 text-zinc-400">
+                Your AI suggestion will appear here after generation.
               </p>
             </div>
           )}
 
-          {/* Loading / Regenerating state */}
+          {/* Loading */}
           {isBusy && (
-            <div
-              role="status"
-              className="flex min-h-[228px] flex-col items-center justify-center gap-3 text-center"
-            >
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
               <div
-                className="h-10 w-10 animate-spin rounded-full border-2 border-zinc-700 border-t-orange-400"
                 aria-hidden="true"
+                className="size-9 animate-spin rounded-full border-2 border-zinc-700 border-t-orange-400 motion-reduce:animate-none"
               />
 
               <div className="space-y-1">
-                <p className="text-base font-semibold text-white">
+                <p className="text-sm font-semibold">
                   {status === "generating"
                     ? "Generating suggestion..."
                     : "Generating a new variation..."}
                 </p>
 
-                <p className="text-sm text-zinc-400">
-                  Please wait while the AI prepares a suggestion.
+                <p className="text-xs leading-5 text-zinc-400">
+                  {status === "regenerating"
+                    ? "Your previous suggestion is preserved."
+                    : "Please wait while the mock AI responds."}
                 </p>
               </div>
             </div>
           )}
 
-          {/* Error state */}
+          {/* Error: role alert announces the failure */}
           {status === "error" && (
             <div
               role="alert"
-              className="flex min-h-[228px] flex-col items-center justify-center gap-3 text-center"
+              className="space-y-2 rounded-xl border border-red-500/40 bg-red-500/10 p-4"
             >
-              <div className="rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-red-300">
-                Generation Failed
+              <p className="text-sm font-semibold text-red-300">
+                {suggestion
+                  ? "Couldn't regenerate the suggestion."
+                  : "Couldn't generate a suggestion."}
+              </p>
+
+              <p className="text-sm leading-6 text-zinc-200">
+                {error ?? "Something went wrong. Please try again."}
+              </p>
+            </div>
+          )}
+
+          {/* Editing */}
+          {isEditing && (
+            <div className="space-y-4">
+              <p
+                id={editHelpId}
+                className="rounded-xl border border-orange-500/30 bg-orange-500/5 px-3 py-2 text-xs leading-5 text-orange-300"
+              >
+                You are editing the proposed suggestion, not your original
+                description.
+              </p>
+
+              <div className="space-y-2">
+                <label htmlFor={editId} className="block text-sm font-medium">
+                  Edit Suggestion
+                </label>
+
+                <textarea
+                  ref={editorRef}
+                  id={editId}
+                  aria-describedby={editHelpId}
+                  rows={8}
+                  value={draft}
+                  onChange={(event) => {
+                    const value = event.target.value;
+
+                    setEditSession((current) =>
+                      current ? { ...current, text: value } : null,
+                    );
+                  }}
+                  className="w-full resize-y rounded-xl border border-white/20 bg-black/40 p-4 text-sm leading-6 text-white outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-400/30"
+                />
               </div>
 
-              <div className="space-y-1">
-                <p className="text-base font-semibold text-white">
-                  We couldn't generate a suggestion.
-                </p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={!draft.trim()}
+                  className={primaryButton}
+                >
+                  Save Edit
+                </button>
 
-                <p className="text-sm text-zinc-400">
-                  {error ??
-                    "Something went wrong. Please try again."}
-                </p>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className={secondaryButton}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           )}
 
-          {/* Successful suggestion preview */}
-          {status === "success" &&
-            hasSuggestion &&
-            !isEditing && (
-              <div className="space-y-3">
-                <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 px-3 py-2 text-xs font-medium text-orange-300">
-                  Preview only — this suggestion has not been
-                  applied yet.
-                </div>
+          {/* Preview */}
+          {showPreview && (
+            <div className="space-y-3">
+              <p className="rounded-xl border border-orange-500/30 bg-orange-500/5 px-3 py-2 text-xs leading-5 text-orange-300">
+                {status === "regenerating"
+                  ? "Previous suggestion — waiting for a new variation."
+                  : status === "error"
+                    ? "Your previous suggestion is still available."
+                    : "Preview only — this suggestion has not been applied."}
+              </p>
 
-                <div className="rounded-xl border border-white/10 bg-black/30 p-4">
-                  <p className="whitespace-pre-wrap text-sm leading-7 text-zinc-100">
-                    {suggestion}
-                  </p>
-                </div>
+              <div className="rounded-xl border border-white/10 bg-black/40 p-4">
+                <p className="whitespace-pre-wrap break-words text-sm leading-7 text-zinc-100">
+                  {suggestion}
+                </p>
               </div>
-            )}
-
-          {/* Editing state */}
-          {status === "success" &&
-            hasSuggestion &&
-            isEditing && (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 px-3 py-2 text-xs font-medium text-orange-300">
-                  Editing suggestion — save changes to keep
-                  this version.
-                </div>
-
-                <div className="space-y-2">
-                  <label
-                    htmlFor="ai-suggestion-edit"
-                    className="block text-sm font-medium text-white"
-                  >
-                    Edit Suggestion
-                  </label>
-
-                  <textarea
-                    id="ai-suggestion-edit"
-                    rows={8}
-                    value={draft ?? ""}
-                    onChange={(event) =>
-                      setDraft(event.target.value)
-                    }
-                    className="w-full resize-y rounded-xl border border-white/10 bg-black/30 p-4 text-sm leading-6 text-white outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-400/30"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSaveEdit}
-                    disabled={!draft?.trim()}
-                    className="rounded-xl border border-orange-500 bg-orange-500 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Save Edit
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-zinc-800"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex flex-wrap gap-3">
-        {status === "success" &&
-          hasSuggestion &&
-          !isEditing && (
-            <>
-              <button
-                type="button"
-                onClick={handleStartEdit}
-                className="rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-zinc-800"
-              >
-                Edit
-              </button>
-
-              <button
-                type="button"
-                onClick={onAccept}
-                className="rounded-xl border border-orange-500 bg-orange-500 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-orange-400"
-              >
-                Apply Suggestion
-              </button>
-
-              <button
-                type="button"
-                onClick={onReject}
-                className="rounded-xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-white/20 hover:bg-zinc-800"
-              >
-                Reject
-              </button>
-
-              <button
-                type="button"
-                onClick={onRegenerate}
-                className="rounded-xl border border-orange-500/40 bg-transparent px-4 py-2.5 text-sm font-semibold text-orange-300 transition hover:border-orange-400 hover:bg-orange-500/10"
-              >
-                Regenerate
-              </button>
-            </>
+      {/* Success actions */}
+      {status === "success" && suggestion !== null && !isEditing && (
+        <div className="space-y-3">
+          {hasManualEdits && (
+            <p className="text-xs leading-5 text-orange-300">
+              This suggestion contains saved edits. Regenerating will replace
+              them.
+            </p>
           )}
 
-        {/* Retry button appears only after failure */}
-        {status === "error" && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="rounded-xl border border-orange-500 bg-orange-500 px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-orange-400"
-          >
+          <div className="flex flex-wrap gap-3">
+            <button
+              ref={editButtonRef}
+              type="button"
+              onClick={handleStartEdit}
+              className={secondaryButton}
+            >
+              Edit
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAccept}
+              className={primaryButton}
+            >
+              Apply Suggestion
+            </button>
+
+            <button
+              type="button"
+              onClick={handleReject}
+              className={secondaryButton}
+            >
+              Reject
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRegenerate}
+              className={accentButton}
+            >
+              Regenerate
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error recovery */}
+      {status === "error" && (
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={handleRetry} className={primaryButton}>
             Retry
           </button>
-        )}
-      </div>
+
+          {suggestion !== null && (
+            <button
+              type="button"
+              onClick={handleKeepPrevious}
+              className={accentButton}
+            >
+              Keep Previous
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleReject}
+            className={secondaryButton}
+          >
+            {suggestion !== null ? "Reject Previous" : "Dismiss"}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
